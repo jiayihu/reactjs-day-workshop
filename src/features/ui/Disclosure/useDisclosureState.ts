@@ -1,41 +1,84 @@
-/**
- * const { visible, show, hide } = useDisclosureState({  })
- */
-
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
+import { isDefined } from '../../../utils';
+import { usePrevious } from '../../misc/usePrevious';
 
 export type DisclosureState = {
-  id?: string;
   visible: boolean;
+  animated: boolean | number;
+  animating: boolean;
 };
 
-export type DisclosureReturnState = DisclosureState & {
+export type DisclosureActions = {
   show: () => void;
   hide: () => void;
   toggle: () => void;
+  setVisible: React.Dispatch<React.SetStateAction<DisclosureState['visible']>>;
+  setAnimated: React.Dispatch<React.SetStateAction<DisclosureState['animated']>>;
+  stopAnimation: () => void;
 };
 
-export function useDisclosureState(initialState: DisclosureState): DisclosureReturnState {
-  const baseId = useId();
-  const [visible, setVisible] = useState(initialState.visible);
+export type DisclosureInitialState = Partial<Pick<DisclosureState, 'visible' | 'animated'>>;
 
-  const show = useCallback(() => {
-    setVisible(true);
-  }, []);
+export type DisclosureStateReturn = DisclosureState &
+  DisclosureActions & {
+    id: string;
+  };
 
-  const hide = useCallback(() => {
-    setVisible(false);
-  }, []);
+export function useDisclosureState(
+  initialState: DisclosureInitialState = {},
+): DisclosureStateReturn {
+  const id = useId();
 
-  const toggle = useCallback(() => {
-    setVisible((visible) => !visible);
-  }, []);
+  const [visible, setVisible] = useState(initialState.visible ?? false);
+  const [animated, setAnimated] = useState(initialState.animated ?? false);
+  const [animating, setAnimating] = useState(false);
+  const previousVisible = usePrevious(visible);
+
+  const visibleHasChanged = isDefined(previousVisible) && previousVisible !== visible;
+
+  if (animated && !animating && visibleHasChanged) {
+    // Sets animating to true when when visible is updated
+    setAnimating(true);
+  }
+
+  useEffect(() => {
+    if (typeof animated === 'number' && animating) {
+      const timeout = setTimeout(() => setAnimating(false), animated);
+      return () => {
+        clearTimeout(timeout);
+      };
+    }
+    return () => {};
+  }, [animated, animating]);
+
+  const show = useCallback(() => setVisible(true), []);
+  const hide = useCallback(() => setVisible(false), []);
+  const toggle = useCallback(() => setVisible((v) => !v), []);
+  const stopAnimation = useCallback(() => setAnimating(false), []);
 
   return {
-    id: initialState.id ?? baseId,
+    id,
     visible,
+    animated,
+    animating,
     show,
     hide,
     toggle,
+    setVisible,
+    setAnimated,
+    stopAnimation,
   };
 }
+
+export const discosureStateProps: Array<keyof DisclosureStateReturn> = [
+  'id',
+  'visible',
+  'animated',
+  'animating',
+  'show',
+  'hide',
+  'toggle',
+  'setVisible',
+  'setAnimated',
+  'stopAnimation',
+];

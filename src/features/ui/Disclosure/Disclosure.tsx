@@ -1,24 +1,28 @@
 import { omit } from 'lodash';
-import { MouseEvent, useCallback } from 'react';
-import { BoxProps } from 'reakit/ts';
-import { Box, Button } from 'theme-ui';
-import { ClickableOptions, clickablePropNames, useClickable } from '../abstract/Clickable';
-import { DisclosureReturnState } from './useDisclosureState';
+import { ReactElement, useCallback } from 'react';
+import { Box, BoxProps, Button } from 'theme-ui';
+import {
+  clickableOptions,
+  ClickableOptions,
+  ClickableProps,
+  useClickable,
+} from '../abstract/Clickable';
+import { DisclosureStateReturn, discosureStateProps } from './useDisclosureState';
 
 export type DisclosureOptions = ClickableOptions &
-  Pick<DisclosureReturnState, 'id' | 'visible' | 'toggle'>;
+  Pick<Partial<DisclosureStateReturn>, 'visible'> &
+  Pick<DisclosureStateReturn, 'toggle' | 'id'>;
 
-export const useDisclosure = (options: DisclosureOptions) => {
+export type DisclosureProps = ClickableProps;
+
+export const useDisclosure = (options: DisclosureOptions): DisclosureProps => {
   const clickableProps = useClickable(options);
-  const { toggle } = options;
+  const toggle = options.toggle;
 
   const onClick = useCallback(
-    (event: MouseEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
-
-      toggle();
+    (event: React.MouseEvent) => {
+      if (event.defaultPrevented) return;
+      toggle?.();
     },
     [toggle],
   );
@@ -31,18 +35,14 @@ export const useDisclosure = (options: DisclosureOptions) => {
   };
 };
 
-const disclosurePropNames: Array<keyof DisclosureOptions> = [
-  ...clickablePropNames,
-  'id',
-  'toggle',
-  'visible',
-];
+export const disclosureOptions: Array<keyof DisclosureOptions> = [...clickableOptions];
+const excludedDisclosureProps = Array.from(new Set([...disclosureOptions, ...discosureStateProps]));
 
-export function Disclosure(props: DisclosureOptions & BoxProps) {
+export function Disclosure(props: DisclosureOptions & BoxProps): ReactElement {
   const disclosureProps = useDisclosure(props);
 
   return (
-    <Box as={Button} {...disclosureProps} {...omit(props, disclosurePropNames)}>
+    <Box as={Button} {...disclosureProps} {...omit(props, excludedDisclosureProps)}>
       {props.children}
     </Box>
   );

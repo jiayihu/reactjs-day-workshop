@@ -1,81 +1,38 @@
-/**
- * <Clickable>Click me</Clickable>
- *
- * <Clickable as="div">Click me</Clickable>
- *
- * <Clickable as={Button}></Clickable>
- *
- *
- */
-
 import { omit } from 'lodash';
-import {
-  HTMLAttributes,
-  KeyboardEvent,
-  RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { forwardRef, ReactElement, useCallback } from 'react';
 import { Box, BoxProps } from 'theme-ui';
+import { isButton } from '../../../utils/reakit';
+import { useMergeRef } from '../../misc/useMergeRef';
+import { tabbableOptions, TabbableOptions, TabbableProps, useTabbable } from './Tabbable';
 
-function supportsDisabledAttribute(element: HTMLElement) {
-  return ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName);
-}
-
-function isNativeTabbable(element: HTMLElement) {
-  return ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(element.tagName);
-}
-
-function isNativeClick(event: KeyboardEvent<HTMLElement>) {
+function isNativeClick(event: React.KeyboardEvent) {
   const element = event.currentTarget;
-
-  if (!event.isTrusted) {
-    return false;
-  }
-
+  if (!event.isTrusted) return false;
+  // istanbul ignore next: can't test trusted events yet
   return (
-    element.tagName === 'BUTTON' ||
+    isButton(element) ||
+    element.tagName === 'INPUT' ||
     element.tagName === 'TEXTAREA' ||
     element.tagName === 'A' ||
     element.tagName === 'SELECT'
   );
 }
 
-function getTabIndex(element: HTMLElement, options: ClickableOptions) {
-  if (options.disabled && !options.focusable) {
-    return undefined;
-  }
+export type ClickableOptions = TabbableOptions;
 
-  if (isNativeTabbable(element)) {
-    return undefined;
-  }
-
-  return element.tabIndex || 0;
-}
-
-export type ClickableOptions = {
-  disabled?: boolean;
-  focusable?: boolean;
-};
-
-export type ClickableProps = HTMLAttributes<HTMLElement> & {
-  ref: RefObject<HTMLElement>;
-  disabled?: boolean;
-};
+export type ClickableProps = TabbableProps;
 
 export const useClickable = (options: ClickableOptions): ClickableProps => {
-  const ref = useRef<HTMLElement>(null);
-  const [, forceRender] = useState(0);
-
-  useEffect(() => {
-    forceRender((i) => i + 1);
-  }, []);
+  const tabbableProps = useTabbable(options);
 
   const onKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLElement>) => {
-      if (options.disabled || event.defaultPrevented || event.currentTarget !== event.target) {
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (
+        options.disabled ||
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.currentTarget !== event.target
+      ) {
         return;
       }
 
@@ -93,31 +50,39 @@ export const useClickable = (options: ClickableOptions): ClickableProps => {
     [options.disabled],
   );
 
+  const onKeyUp = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (options.disabled || event.defaultPrevented || event.metaKey) {
+        return;
+      }
+
+      const isSpace = event.key === ' ';
+
+      if (isSpace) {
+        event.currentTarget.click();
+      }
+    },
+    [options.disabled],
+  );
+
   return {
-    ref,
-    disabled:
-      options.disabled &&
-      !options.focusable &&
-      ref.current &&
-      supportsDisabledAttribute(ref.current)
-        ? true
-        : false,
-    tabIndex: ref.current ? getTabIndex(ref.current, options) : undefined,
-    role: ref.current && ref.current.tagName !== 'BUTTON' ? 'button' : undefined,
+    ...tabbableProps,
+    role: tabbableProps.ref.current && !isButton(tabbableProps.ref.current) ? 'button' : undefined,
     onKeyDown,
+    onKeyUp,
   };
 };
 
-export const clickablePropNames: Array<keyof ClickableOptions> = ['disabled', 'focusable'];
+export const clickableOptions: Array<keyof ClickableOptions> = [...tabbableOptions];
 
-export type Props = ClickableOptions & BoxProps;
-
-export function Clickable(props: Props) {
-  const clickableProps = useClickable(props);
+export const Clickable = forwardRef((props: ClickableOptions & BoxProps, ref): ReactElement => {
+  const { children, ...boxProps } = props;
+  const { ref: internalRef, ...clickableProps } = useClickable(props);
+  const finalRef = useMergeRef(ref, internalRef);
 
   return (
-    <Box {...clickableProps} {...omit(props, clickablePropNames)}>
-      {props.children}
+    <Box ref={finalRef} {...clickableProps} {...omit(boxProps, clickableOptions)}>
+      {children}
     </Box>
   );
-}
+});
