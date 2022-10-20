@@ -14,7 +14,19 @@ describe('Clickable', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  // it("Should allow to specify a different element", () => {
+  it('Should allow to specify a different element', () => {
+    const handleClick = jest.fn();
 
-  // })
+    render(
+      <Clickable as="button" onClick={handleClick}>
+        Clickable
+      </Clickable>,
+    );
+
+    const element = screen.getByRole('button');
+
+    fireEvent.click(element, { key: 'Enter' });
+
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
 });

@@ -8,6 +8,7 @@
  *
  */
 
+import { omit } from 'lodash';
 import {
   HTMLAttributes,
   KeyboardEvent,
@@ -17,7 +18,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Box } from 'theme-ui';
+import { Box, BoxProps } from 'theme-ui';
 
 function supportsDisabledAttribute(element: HTMLElement) {
   return ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName);
@@ -107,13 +108,15 @@ export const useClickable = (options: ClickableOptions): ClickableProps => {
   };
 };
 
-export type Props = ClickableOptions & HTMLAttributes<HTMLElement>;
+export const clickablePropNames: Array<keyof ClickableOptions> = ['disabled', 'focusable'];
+
+export type Props = ClickableOptions & BoxProps;
 
 export function Clickable(props: Props) {
   const clickableProps = useClickable(props);
 
   return (
-    <Box {...clickableProps} {...props}>
+    <Box {...clickableProps} {...omit(props, clickablePropNames)}>
       {props.children}
     </Box>
   );
