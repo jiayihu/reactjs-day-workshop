@@ -1,3 +1,5 @@
+import { CurrencyValue } from '../misc/currency/currency.types';
+
 export type BankAccount = {
   kind: 'Bank';
   id: string;
@@ -11,18 +13,17 @@ export type CashAccount = {
   kind: 'Cash';
   id: string;
   name: string;
-  amount: CurrencyValue;
-  lastUpdate: string | null;
+  amount: number;
 };
 
-export type Account = BankAccount | CashAccount;
+export type Account = BankAccount;
 
-export type CurrencyValue = {
-  amount: string;
-  currency: string;
-};
+export function isBankAccount(account: Account): account is BankAccount {
+  return account.kind === 'Bank';
+}
 
 export type Balance = {
   balanceAmount: CurrencyValue;
   balanceType: 'expected' | 'interimAvailable';
+  referenceDate: string;
 };
