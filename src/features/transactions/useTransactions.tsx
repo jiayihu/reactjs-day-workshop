@@ -15,7 +15,7 @@ export function useTransactions(uid: string, accounts: Account[]) {
 
   useEffect(() => {
     accounts.forEach((account) =>
-      dispatch(requestAccountTransactions(uid, account, { skipUpdate: false })),
+      dispatch(requestAccountTransactions(uid, account.id, { skipUpdate: false })),
     );
   }, [uid, accounts, dispatch]);
 

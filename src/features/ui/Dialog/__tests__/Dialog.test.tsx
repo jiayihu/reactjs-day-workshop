@@ -84,7 +84,7 @@ describe('DialogDisclosure', () => {
 
 describe('useDialogState', () => {
   it('Should allow to change the visibility state', () => {
-    const { result } = renderHook(() => useDialogState());
+    const { result } = renderHook(() => useDialogState({}));
 
     expect(result.current.visible).toBe(false);
 

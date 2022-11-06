@@ -1,23 +1,10 @@
 import { format, startOfMonth } from 'date-fns';
-import {
-  collection,
-  CollectionReference,
-  doc,
-  DocumentReference,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-} from 'firebase/firestore';
-import { db } from '../../services/firestore';
-import { requestAuthenticatedNordigen } from '../../services/nordigen';
-import { BankAccount } from '../account/account.types';
-import { CurrencyValue } from '../misc/currency/currency.types';
-import { BaseTransaction, IdentityName, Transaction, TransactionKind } from './transaction.types';
+import { psd2DateFormat, requestAuthenticatedNordigen } from '../../../services/nordigen';
+import { BankAccount } from '../../account/account.types';
+import { CurrencyValue } from '../../misc/currency/currency.types';
+import { BaseTransaction, IdentityName, Transaction, TransactionKind } from '../transaction.types';
 
-type PSD2Transaction = {
+export type PSD2Transaction = {
   transactionId: string;
   bankTransactionCode?: TransactionKind;
   bookingDate: string;
@@ -33,19 +20,27 @@ type PSD2Transaction = {
   remittanceInformationUnstructuredArray?: string[];
 };
 
-type GetTransactionsResponse = {
+export type GetTransactionsResponse = {
   transactions: { booked: PSD2Transaction[]; pending: PSD2Transaction[] };
 };
 
 const mappers: Partial<
   Record<string, (transaction: PSD2Transaction, index: number) => Transaction>
 > = {
-  SANDBOXFINANCE_SFIN0000: (t, index): Transaction => {
+  ING_INGBITMM: (t): Transaction => {
+    const bankTransactionCodeMap: Partial<Record<string, TransactionKind>> = {
+      'PAGAMENTO CARTA': TransactionKind.Payment,
+      'PAGAMENTO I24': TransactionKind.Payment,
+      'VS.DISPOSIZIONE': TransactionKind.Transfer,
+    };
+
     const transactionKind =
-      Number(t.transactionAmount.amount) < 0 ? TransactionKind.Payment : TransactionKind.Transfer;
+      (t.proprietaryBankTransactionCode &&
+        bankTransactionCodeMap[t.proprietaryBankTransactionCode]) ||
+      TransactionKind.Unknown;
 
     const baseTransaction: BaseTransaction = {
-      transactionId: `fake-transaction-${index}`,
+      transactionId: t.transactionId,
       bookingDate: t.bookingDate,
       transactionAmount: t.transactionAmount,
       valueDate: t.valueDate,
@@ -67,7 +62,7 @@ const mappers: Partial<
       return {
         kind: transactionKind,
         ...baseTransaction,
-        debtorName: t.debtorName ?? t.debtorAccount?.iban ?? IdentityName.Unknown,
+        debtorName: t.debtorName ?? baseTransaction.information.description ?? IdentityName.Unknown,
       };
     }
 
@@ -122,19 +117,41 @@ const mappers: Partial<
 };
 
 const defaultMapper = (t: PSD2Transaction): Transaction => {
-  return {
-    kind: TransactionKind.Unknown,
+  const transactionKind =
+    Number(t.transactionAmount.amount) < 0 ? TransactionKind.Payment : TransactionKind.Transfer;
+
+  const baseTransaction: BaseTransaction = {
     transactionId: t.transactionId,
     bookingDate: t.bookingDate,
     transactionAmount: t.transactionAmount,
     valueDate: t.valueDate,
     category: null,
     exclude: false,
-    information: { description: t.remittanceInformationUnstructuredArray?.join(', ') ?? null },
+    information: { description: t.remittanceInformationUnstructured ?? null },
+  };
+
+  if (transactionKind === TransactionKind.Payment) {
+    return {
+      kind: transactionKind,
+      ...baseTransaction,
+      creditorName:
+        t.creditorName ?? baseTransaction.information.description ?? IdentityName.Unknown,
+    };
+  }
+
+  if (transactionKind === TransactionKind.Transfer) {
+    return {
+      kind: transactionKind,
+      ...baseTransaction,
+      debtorName: t.debtorName ?? baseTransaction.information.description ?? IdentityName.Unknown,
+    };
+  }
+
+  return {
+    kind: TransactionKind.Unknown,
+    ...baseTransaction,
   };
 };
-
-export const psd2DateFormat = 'yyyy-MM-dd';
 
 export function getInstitutionAccountTransactions(
   { institutionId, id }: BankAccount,
@@ -153,88 +170,9 @@ export function getInstitutionAccountTransactions(
   return requestAuthenticatedNordigen<GetTransactionsResponse>(
     `accounts/${id}/transactions/?${queryParams.toString()}`,
   ).then((response) => {
-    return response.transactions.booked.slice(0, 10).map((transaction, i) => {
+    return response.transactions.booked.map((transaction, i) => {
       const mapper = mappers[institutionId] ?? defaultMapper;
       return mapper(transaction, i);
     });
   });
-}
-
-export async function getAccountTransactions(
-  uid: string,
-  accountId: string,
-  {
-    fromDate = startOfMonth(new Date()),
-    toDate = new Date(),
-  }: { fromDate?: Date; toDate?: Date } = {},
-): Promise<Transaction[]> {
-  const collectionRef = collection(
-    db,
-    'users',
-    uid,
-    'accounts',
-    accountId,
-    'transactions',
-  ) as CollectionReference<Transaction>;
-  const q = query<Transaction>(
-    collectionRef,
-    where('bookingDate', '>=', format(fromDate, psd2DateFormat)),
-    where('bookingDate', '<=', format(toDate, psd2DateFormat)),
-  );
-  const querySnap = await getDocs(q);
-
-  return querySnap.docs.map((doc) => doc.data());
-}
-
-export function addAccountTransactions(
-  uid: string,
-  accountId: string,
-  transactions: Transaction[],
-) {
-  const batch = writeBatch(db);
-  const docRefs = transactions.map((t) => {
-    const docRef = doc(db, 'users', uid, 'accounts', accountId, 'transactions', t.transactionId);
-    return [docRef, t] as const;
-  });
-
-  docRefs.forEach(([docRef, transaction]) => batch.set(docRef, transaction));
-
-  return batch.commit();
-}
-
-export function addAccountTransaction(
-  uid: string,
-  accountId: string,
-  transaction: Transaction,
-): Promise<void> {
-  const docRef = doc(
-    db,
-    'users',
-    uid,
-    'accounts',
-    accountId,
-    'transactions',
-    transaction.transactionId,
-  );
-
-  return setDoc(docRef, transaction);
-}
-
-export async function updateAccountTransaction(
-  uid: string,
-  accountId: string,
-  transactionId: string,
-  transaction: Partial<Transaction>,
-): Promise<void> {
-  const docRef = doc(
-    db,
-    'users',
-    uid,
-    'accounts',
-    accountId,
-    'transactions',
-    transactionId,
-  ) as DocumentReference<Transaction>;
-
-  return updateDoc(docRef, transaction);
 }

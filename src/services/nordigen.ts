@@ -37,28 +37,28 @@ export function requestNordigen<T>(
     });
 }
 
-type NewTokenResponse = {
-  access: 'string';
+export type NewTokenResponse = {
+  access: string;
   access_expires: 86400;
-  refresh: 'string';
+  refresh: string;
   refresh_expires: 2592000;
 };
 
-type RefreshTokenResponse = {
-  access: 'string';
+export type RefreshTokenResponse = {
+  access: string;
   access_expires: 86400;
 };
 
-type SavedToken = {
-  access: 'string';
+export type SavedToken = {
+  access: string;
   access_expires: string;
-  refresh: 'string';
+  refresh: string;
   refresh_expires: string;
 };
 
-const STORAGE_KEY = 'NORDIGEN';
+export const STORAGE_KEY = 'NORDIGEN';
 
-export function getNordigenToken() {
+export async function getNordigenToken() {
   return requestNordigen<NewTokenResponse>('token/new/', {
     secret_id: process.env.REACT_APP_NORDIGEN_SECRET_ID,
     secret_key: process.env.REACT_APP_NORDIGEN_SECRET_KEY,
@@ -82,10 +82,23 @@ export function refreshNordigenToken(): Promise<void> {
   );
 }
 
+export type NordigenErrorResponse = {
+  summary: string;
+  detail: string;
+  status_code: number;
+};
+
+export const isNordigenError = (error: unknown): error is NordigenErrorResponse => {
+  return isObject(error) && 'status_code' in error;
+};
+
+const MAX_ATTEMPT = 1;
+
 export function requestAuthenticatedNordigen<T>(
   resource: string,
   body?: Record<string, unknown>,
   options?: RequestInit,
+  attempt = 0,
 ): Promise<T> {
   const savedToken = retrieveToken();
 
@@ -107,7 +120,7 @@ export function requestAuthenticatedNordigen<T>(
     }
 
     // Get a new access token and repeat the request
-    return refreshNordigenToken().then(() => requestAuthenticatedNordigen(resource, body, options));
+    return getNordigenToken().then(() => requestAuthenticatedNordigen(resource, body, options));
   }
 
   // Normal request with the token
@@ -116,26 +129,37 @@ export function requestAuthenticatedNordigen<T>(
     ...options,
   }).catch((error) => {
     console.error(error);
-    // Should refresh token, possible infinite loop?
-    if (error instanceof Error && error.message.includes('401')) {
+
+    if (attempt >= MAX_ATTEMPT) {
+      throw error;
+    }
+
+    // Should refresh token
+    if (
+      isNordigenError(error) &&
+      error.status_code === 401 &&
+      error.summary.match(/invalid token/i)
+    ) {
       const now = new Date();
       const refreshExpiration = new Date(savedToken.refresh_expires);
 
       if (isBefore(now, refreshExpiration)) {
         return refreshNordigenToken().then(() =>
-          requestAuthenticatedNordigen(resource, body, options),
+          requestAuthenticatedNordigen(resource, body, options, attempt + 1),
         );
       }
 
       // Get the access token and repeat the request
-      return getNordigenToken().then(() => requestAuthenticatedNordigen(resource, body, options));
+      return getNordigenToken().then(() =>
+        requestAuthenticatedNordigen(resource, body, options, attempt + 1),
+      );
     }
 
     throw error;
   });
 }
 
-function persistToken(response: NewTokenResponse) {
+export function persistToken(response: NewTokenResponse) {
   const now = new Date();
   const savedToken: SavedToken = {
     access: response.access,
@@ -146,7 +170,7 @@ function persistToken(response: NewTokenResponse) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedToken));
 }
 
-function persistRefreshedToken(savedToken: SavedToken, response: RefreshTokenResponse) {
+export function persistRefreshedToken(savedToken: SavedToken, response: RefreshTokenResponse) {
   const now = new Date();
   const refreshedToken: SavedToken = {
     access: response.access,
@@ -157,9 +181,11 @@ function persistRefreshedToken(savedToken: SavedToken, response: RefreshTokenRes
   localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedToken));
 }
 
-function retrieveToken(): SavedToken | null {
+export function retrieveToken(): SavedToken | null {
   const savedToken = localStorage.getItem(STORAGE_KEY);
   const token: SavedToken | null = savedToken ? JSON.parse(savedToken) : null;
 
   return token;
 }
+
+export const psd2DateFormat = 'yyyy-MM-dd';

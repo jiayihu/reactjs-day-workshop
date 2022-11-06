@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Clickable } from '../Clickable';
 
@@ -7,18 +7,18 @@ describe('Clickable', () => {
     const handleClick = jest.fn();
     render(<Clickable onClick={handleClick}>Clickable</Clickable>);
 
-    userEvent.type(screen.getByRole('button'), '{enter}');
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
 
-    expect(handleClick).toHaveBeenCalled();
+    expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it('Should make a DIV clickable with Space', () => {
     const handleClick = jest.fn();
     render(<Clickable onClick={handleClick}>Clickable</Clickable>);
 
-    userEvent.type(screen.getByRole('button'), '{space}');
+    fireEvent.keyUp(screen.getByRole('button'), { key: ' ' });
 
-    expect(handleClick).toHaveBeenCalled();
+    expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it('Should make a DIV still clickable with mouse', () => {
@@ -27,7 +27,7 @@ describe('Clickable', () => {
 
     userEvent.click(screen.getByRole('button'));
 
-    expect(handleClick).toHaveBeenCalled();
+    expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it('Should add role="button" if not using a <button />', () => {

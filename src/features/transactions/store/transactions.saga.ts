@@ -1,12 +1,10 @@
 import { formatISO } from 'date-fns';
 import { all, call, put, takeEvery } from 'redux-saga/effects';
-import { updateSavedAccount } from '../../account/accounts.service';
+import { BankAccount } from '../../account/account.types';
+import { getSavedAccount, updateSavedAccount } from '../../account/services/accounts.firebase';
+import { addAccountTransactions, getAccountTransactions } from '../services/transactions.firebase';
+import { getInstitutionAccountTransactions } from '../services/transactions.nordigen';
 import { Transaction } from '../transaction.types';
-import {
-  addAccountTransactions,
-  getAccountTransactions,
-  getInstitutionAccountTransactions,
-} from '../transactions.service';
 import {
   RequestAccountTransactionsAction,
   requestAccountTransactionsError,
@@ -26,7 +24,10 @@ import {
  * - Update last transactions from Firestore
  */
 function* requestTransactions(action: RequestAccountTransactionsAction) {
-  const { uid, account, config } = action.payload;
+  const { uid, accountId, config } = action.payload;
+
+  const account: BankAccount = yield call(getSavedAccount, uid, accountId);
+
   const { lastUpdate } = account;
 
   function* fetchSavedTransactions() {

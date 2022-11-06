@@ -1,46 +1,32 @@
-# Getting Started with Create React App
+# skei
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Available Scripts
+> **NOTE**: the API keys used during the workshop have been revoked and don't work anymore. You need to create your own accounts with [Firebase](https://firebase.google.com/) and [Nordigen](https://nordigen.com/en/)
 
-In the project directory, you can run:
+## Testing
 
-### `npm start`
+During testing, Nordigen APIs have actually been mocked with [MSW](https://mswjs.io/) to avoid unnecessary hitting the real APIs whereas Firebase API services have been mocked with fixtures. This means that you don't actually any account in order to run the tests and play with them.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Firebase
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Firebase is used for Authentication and Realtime Database (Firestore). After you have [created a project with Firebase](https://cloud.google.com/firestore/docs/client/get-firebase?hl=en), copy over the [configuration keys](https://support.google.com/firebase/answer/7015592?hl=en#zippy=%2Cin-this-article) into the file `src/services/firebase.ts`:
 
-### `npm test`
+```js
+const firebaseConfig = {
+  apiKey: 'API_KEY',
+  authDomain: 'skei-11111.firebaseapp.com',
+  projectId: 'skei-11111',
+  storageBucket: 'skei-11111.appspot.com',
+  appId: '1:1111111:web:11111asacv11111',
+};
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Nordigen
 
-### `npm run build`
+Nordigen is used as service provider for PSD2 bank information. After you have created an account, copy over the [User Secrets](https://ob.nordigen.com/user-secrets/) into the file `.env`:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+REACT_APP_NORDIGEN_SECRET_ID=secret-id
+REACT_APP_NORDIGEN_SECRET_KEY=secret-key
+```

@@ -25,6 +25,7 @@ export type Category = {
   color: string;
 };
 
+/** Use a Record to ensure all CategoryName values have a value */
 export const categoryMap: Record<CategoryName, Category> = {
   [CategoryName.Entertainment]: {
     name: CategoryName.Entertainment,

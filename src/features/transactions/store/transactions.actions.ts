@@ -9,12 +9,12 @@ export enum TransactionActionType {
 
 export function requestAccountTransactions(
   uid: string,
-  account: Account,
+  accountId: string,
   config: { skipUpdate: boolean },
 ) {
   return {
     type: TransactionActionType.REQUEST_TRANSACTIONS,
-    payload: { uid, account, config },
+    payload: { uid, accountId, config },
   } as const;
 }
 
